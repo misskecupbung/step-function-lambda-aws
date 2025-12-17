@@ -1,52 +1,58 @@
 {
-  "Comment": "An example of the Amazon States Language using a Parallel and a Choice state to execute two branches at the same time.",
-  "StartAt": "StartTask",
+  "Comment": "Game level completion workflow using parallel execution for report generation and database updates, followed by CloudWatch metrics.",
+  "StartAt": "ProcessLevelCompletion",
   "States": {
-    "StartTask": {
+    "ProcessLevelCompletion": {
       "Type": "Parallel",
-      "Next": "CWMetric",
+      "Comment": "Execute report generation and database update in parallel",
+      "Next": "PublishMetrics",
       "Branches": [
         {
-          "StartAt": "Gen Report",
+          "StartAt": "GenerateReport",
           "States": {
-            "Gen Report": {
+            "GenerateReport": {
               "Type": "Task",
-              "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:GenerateReport",
+              "Comment": "Generate and upload level completion report to S3",
+              "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:generate_report",
               "End": true
             }
           }
         },
         {
-          "StartAt": "UpdateDB",
+          "StartAt": "CheckLevelType",
           "States": {
-            "UpdateDB": {
+            "CheckLevelType": {
               "Type": "Choice",
+              "Comment": "Route to appropriate handler based on level type",
               "Choices": [
                 {
                   "Variable": "$.level",
                   "StringEquals": "latest",
-                  "Next": "Last Level"
+                  "Next": "HandleLastLevel"
                 }
               ],
-              "Default": "Simple Level"
+              "Default": "HandleSimpleLevel"
             },
-            "Last Level": {
+            "HandleLastLevel": {
               "Type": "Task",
-              "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:EndsLastLevel",
+              "Comment": "Record game completion for final level",
+              "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:ends_last_level",
               "End": true
             },
-            "Simple Level": {
+            "HandleSimpleLevel": {
               "Type": "Task",
-              "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:EndsSimpleLevel",
+              "Comment": "Update progress for non-final levels",
+              "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:ends_simple_level",
               "End": true
             }
           }
         }
       ]
     },
-    "CWMetric": {
+    "PublishMetrics": {
       "Type": "Task",
-      "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:PutMetric",
+      "Comment": "Publish game metrics to CloudWatch",
+      "Resource": "arn:aws:lambda:us-west-2:ACCOUNT_ID:function:put_metric",
       "End": true
     }
   }
